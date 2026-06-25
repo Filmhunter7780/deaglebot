@@ -4,14 +4,13 @@ import os
 import re
 import time
 
-# ВСТАВЬ СЮДА СВОЙ НОВЫЙ ТОКЕН (старый обязательно отзовите в BotFather!)
+# ВСТАВЬ СЮДА СВОЙ НОВЫЙ ТОКЕН (старый обязательно отозви в BotFather!)
 TOKEN = "8660904490:AAEGfU2Uu884fSA4NKGUSbpuHLtYDC3DLK4"
 bot = telebot.TeleBot(TOKEN)
 
 STATS_FILE = "digl_stats.json"
 
-# Переменная для хранения времени последнего написания слова (анти-спам)
-# Формат: {chat_id: {user_id: timestamp}}
+# Переменная для хранения времени (анти-спам)
 cooldowns = {}
 COOLDOWN_TIME = 3600  # 3600 секунд = 1 час
 
@@ -29,10 +28,13 @@ def save_stats(stats):
 
 stats = load_stats()
 
-# Функция для подсчета слова "дигл" в сообщении (игнорируем регистр)
-def count_digl(text):
-    matches = re.findall(r'\bдигл\b', text.lower())
-    return len(matches)
+# Функция проверки наличия слова "дигл" в сообщении
+def has_digl(text):
+    # Ищет именно отдельное слово "дигл". 
+    # \b означает границу слова. "диглдигл" не посчитается, "диглер" не посчитается.
+    if re.search(r'\bдигл\b', text.lower()):
+        return True
+    return False
 
 @bot.message_handler(commands=['top'])
 def show_top(message):
@@ -58,31 +60,30 @@ def handle_message(message):
     user_id = str(message.from_user.id)
     user_name = message.from_user.first_name
     
-    count = count_digl(message.text)
-    
-    if count > 0:
+    # Проверяем, есть ли слово "дигл" в сообщении
+    if has_digl(message.text):
         current_time = time.time()
         
-        # --- СИСТЕМА АНТИ-СПАМА ---
+        # --- СИСТЕМА АНТИ-СПАМА (1 раз в час) ---
         if chat_id not in cooldowns:
             cooldowns[chat_id] = {}
             
-        # Проверяем, писал ли уже этот пользователь в этом чате
         if user_id in cooldowns[chat_id]:
             last_time = cooldowns[chat_id][user_id]
             time_passed = current_time - last_time
             
             if time_passed < COOLDOWN_TIME:
-                # Если прошел меньше 1 часа, бот игнорирует (можно раскомментировать строку ниже, чтобы бот ругался)
+                # Если прошел меньше 1 часа, бот просто игнорирует сообщение.
+                # (Если хочешь, чтобы бот писал "подожди час", убери решетки # со следующих 2 строк)
                 # remaining = int((COOLDOWN_TIME - time_passed) / 60)
-                # bot.reply_to(message, f"⏳ Антиспам! Ты сможешь написать 'дигл' через {remaining} мин.")
-                return # Просто игнорируем сообщение
+                # bot.reply_to(message, f"⏳ Антиспам! Ты сможешь написать 'дигл' только через {remaining} мин.")
+                return 
                 
         # Если час прошел (или пишет первый раз), обновляем время
         cooldowns[chat_id][user_id] = current_time
-        # --------------------------
+        # -----------------------------------------
         
-        # Дальше идет стандартная логика подсчета
+        # Добавляем ровно +1 за сообщение
         if chat_id not in stats:
             stats[chat_id] = {}
             
@@ -90,7 +91,7 @@ def handle_message(message):
             stats[chat_id][user_id] = {"name": user_name, "count": 0}
             
         stats[chat_id][user_id]["name"] = user_name
-        stats[chat_id][user_id]["count"] += count
+        stats[chat_id][user_id]["count"] += 1  # Прибавляем всегда 1, сколько бы раз слово ни было в сообщении
         save_stats(stats)
         
         total_count = stats[chat_id][user_id]["count"]
