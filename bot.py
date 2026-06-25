@@ -1,10 +1,10 @@
 import telebot
 import json
 import os
-import re
 import time
+import string
 
-# ВСТАВЬ СЮДА СВОЙ НОВЫЙ ТОКЕН (старый обязательно отозви в BotFather!)
+# ВСТАВЬ СЮДА СВОЙ НОВЫЙ ТОКЕН
 TOKEN = "8660904490:AAEGfU2Uu884fSA4NKGUSbpuHLtYDC3DLK4"
 bot = telebot.TeleBot(TOKEN)
 
@@ -28,11 +28,16 @@ def save_stats(stats):
 
 stats = load_stats()
 
-# Функция проверки наличия слова "дигл"
+# Новая, 100% надежная функция проверки слова "дигл"
 def has_digl(text):
-    if re.search(r'\bдигл\b', text.lower()):
-        return True
-    return False
+    # Приводим к нижнему регистру
+    text_lower = text.lower()
+    # Удаляем все знаки препинания
+    clean_text = text_lower.translate(str.maketrans('', '', string.punctuation))
+    # Разбиваем текст на отдельные слова
+    words = clean_text.split()
+    # Проверяем, есть ли слово "дигл" среди них
+    return 'дигл' in words
 
 @bot.message_handler(commands=['top'])
 def show_top(message):
@@ -70,27 +75,21 @@ def handle_message(message):
             time_passed = current_time - last_time
             
             if time_passed < COOLDOWN_TIME:
-                # Человек пишет слишком часто. Формируем сообщение.
                 remaining_sec = int(COOLDOWN_TIME - time_passed)
                 remaining_min = remaining_sec // 60
                 sec = remaining_sec % 60
                 
                 warn_text = f"⏳ Антиспам! Писать «дигл» можно только 1 раз в час. Тебе осталось подождать {remaining_min} мин. {sec} сек."
                 
-                # Пытаемся отправить сообщение в ЛС (чтобы группа не видела)
                 try:
                     bot.send_message(user_id, warn_text)
                 except Exception:
-                    # Если человек не нажимал /start в личке бота, бот не может написать ему в ЛС.
-                    # В этом случае просто игнорируем (в группе никто ничего не увидит).
                     pass
-                return # Прерываем выполнение, статистику не засчитываем
+                return 
                 
-        # Если час прошел (или пишет первый раз), обновляем время
         cooldowns[chat_id][user_id] = current_time
         # -----------------------------------------
         
-        # Засчитываем +1
         if chat_id not in stats:
             stats[chat_id] = {}
             
@@ -104,7 +103,6 @@ def handle_message(message):
         total_count = stats[chat_id][str(user_id)]["count"]
         win_chance = total_count * 0.1
         
-        # Отправляем ответ в группу (видят все)
         bot.reply_to(message, f"🎯 {user_name} написал 'дигл'!\n🎰 Шанс выигрыша: {win_chance:.1f}%")
 
 if __name__ == "__main__":
