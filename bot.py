@@ -2,13 +2,18 @@ import telebot
 import json
 import os
 import re
+import time
 
-# СЮДА НУЖНО БУДЕТ ВСТАВИТЬ ТВОЙ ТОКЕН
-TOKEN = "8660904490:AAEGfU2Uu884fSA4NKGUSbpuHLtYDC3DLK4"
+# ВСТАВЬ СЮДА СВОЙ НОВЫЙ ТОКЕН (старый обязательно отзовите в BotFather!)
+TOKEN = "ТВОЙ_НОВЫЙ_ТОКЕН_ЗДЕСЬ"
 bot = telebot.TeleBot(TOKEN)
 
-# Файл для сохранения статистики, чтобы при перезапуске бота данные не терялись
 STATS_FILE = "digl_stats.json"
+
+# Переменная для хранения времени последнего написания слова (анти-спам)
+# Формат: {chat_id: {user_id: timestamp}}
+cooldowns = {}
+COOLDOWN_TIME = 3600  # 3600 секунд = 1 час
 
 # Загрузка статистики
 def load_stats():
@@ -26,7 +31,6 @@ stats = load_stats()
 
 # Функция для подсчета слова "дигл" в сообщении (игнорируем регистр)
 def count_digl(text):
-    # Ищет слово "дигл" как отдельное слово (чтобы не считать "диглер")
     matches = re.findall(r'\bдигл\b', text.lower())
     return len(matches)
 
@@ -37,7 +41,6 @@ def show_top(message):
         bot.reply_to(message, "Статистики пока нет. Напишите 'дигл'!")
         return
 
-    # Сортируем пользователей по количеству слов
     sorted_users = sorted(stats[chat_id].items(), key=lambda item: item[1]['count'], reverse=True)
     
     text = "🏆 <b>Топ игроков по слову 'Дигл':</b>\n\n"
@@ -48,7 +51,6 @@ def show_top(message):
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    # Игнорируем сообщения без текста
     if not message.text:
         return
 
@@ -56,32 +58,46 @@ def handle_message(message):
     user_id = str(message.from_user.id)
     user_name = message.from_user.first_name
     
-    # Считаем сколько раз было слово "дигл" в этом сообщении
     count = count_digl(message.text)
     
     if count > 0:
-        # Если чата еще нет в базе, добавляем
+        current_time = time.time()
+        
+        # --- СИСТЕМА АНТИ-СПАМА ---
+        if chat_id not in cooldowns:
+            cooldowns[chat_id] = {}
+            
+        # Проверяем, писал ли уже этот пользователь в этом чате
+        if user_id in cooldowns[chat_id]:
+            last_time = cooldowns[chat_id][user_id]
+            time_passed = current_time - last_time
+            
+            if time_passed < COOLDOWN_TIME:
+                # Если прошел меньше 1 часа, бот игнорирует (можно раскомментировать строку ниже, чтобы бот ругался)
+                # remaining = int((COOLDOWN_TIME - time_passed) / 60)
+                # bot.reply_to(message, f"⏳ Антиспам! Ты сможешь написать 'дигл' через {remaining} мин.")
+                return # Просто игнорируем сообщение
+                
+        # Если час прошел (или пишет первый раз), обновляем время
+        cooldowns[chat_id][user_id] = current_time
+        # --------------------------
+        
+        # Дальше идет стандартная логика подсчета
         if chat_id not in stats:
             stats[chat_id] = {}
             
-        # Если пользователя еще нет в базе чата, добавляем
         if user_id not in stats[chat_id]:
             stats[chat_id][user_id] = {"name": user_name, "count": 0}
             
-        # Обновляем имя (на случай если человек сменил имя)
         stats[chat_id][user_id]["name"] = user_name
-        
-        # Прибавляем количество найденных слов
         stats[chat_id][user_id]["count"] += count
-        save_stats(stats) # Сохраняем в файл
+        save_stats(stats)
         
         total_count = stats[chat_id][user_id]["count"]
-        win_chance = total_count * 0.1 # 1 слово = 0.1%
+        win_chance = total_count * 0.1
         
-        # Отправляем ответ
         bot.reply_to(message, f"🎯 {user_name} сказал(а) 'дигл'!\nВсего слов: {total_count}\n🎰 Шанс выигрыша: {win_chance:.1f}%")
 
 if __name__ == "__main__":
     print("Бот запущен и готов считать слова...")
-    # Запускаем бота, чтобы он работал постоянно
     bot.infinity_polling()
