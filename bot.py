@@ -5,7 +5,7 @@ import re
 import time
 
 # ВСТАВЬ СЮДА СВОЙ НОВЫЙ ТОКЕН (старый обязательно отзовите в BotFather!)
-TOKEN = "ТВОЙ_НОВЫЙ_ТОКЕН_ЗДЕСЬ"
+TOKEN = "8660904490:AAEGfU2Uu884fSA4NKGUSbpuHLtYDC3DLK4"
 bot = telebot.TeleBot(TOKEN)
 
 STATS_FILE = "digl_stats.json"
